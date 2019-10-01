@@ -60,11 +60,9 @@ class CompileError(PyrexError):
         self.message_only = message
         self.formatted_message = format_error(message, position)
         self.reported = False
-    # Deprecated and withdrawn in 2.6:
-    #   self.message = message
         Exception.__init__(self, self.formatted_message)
         # Python Exception subclass pickling is broken,
-        # see http://bugs.python.org/issue1692335
+        # see https://bugs.python.org/issue1692335
         self.args = (position, message)
 
     def __str__(self):
@@ -74,8 +72,6 @@ class CompileWarning(PyrexWarning):
 
     def __init__(self, position = None, message = ""):
         self.position = position
-    # Deprecated and withdrawn in 2.6:
-    #   self.message = message
         Exception.__init__(self, format_position(position) + message)
 
 class InternalError(Exception):
@@ -114,7 +110,7 @@ class CompilerCrash(CompileError):
             message += u'%s: %s' % (cause.__class__.__name__, cause)
         CompileError.__init__(self, pos, message)
         # Python Exception subclass pickling is broken,
-        # see http://bugs.python.org/issue1692335
+        # see https://bugs.python.org/issue1692335
         self.args = (pos, context, message, cause, stacktrace)
 
 class NoElementTreeInstalledException(PyrexError):
@@ -171,7 +167,6 @@ def report_error(err, use_stack=True):
         if Options.fast_fail:
             raise AbortError("fatal errors")
 
-
 def error(position, message):
     #print("Errors.error:", repr(position), repr(message)) ###
     if position is None:
@@ -184,16 +179,22 @@ def error(position, message):
 
 LEVEL = 1 # warn about all errors level 1 or higher
 
+def _write_file_encode(file, line):
+    try:
+        file.write(line)
+    except UnicodeEncodeError:
+        file.write(line.encode('ascii', 'replace'))
+
 
 def message(position, message, level=1):
     if level < LEVEL:
         return
     warn = CompileWarning(position, message)
-    line = "note: %s\n" % warn
+    line = u"note: %s\n" % warn
     if listing_file:
-        listing_file.write(line)
+        _write_file_encode(listing_file, line)
     if echo_file:
-        echo_file.write(line)
+        _write_file_encode(echo_file, line)
     return warn
 
 
@@ -203,11 +204,11 @@ def warning(position, message, level=0):
     if Options.warning_errors and position:
         return error(position, message)
     warn = CompileWarning(position, message)
-    line = "warning: %s\n" % warn
+    line = u"warning: %s\n" % warn
     if listing_file:
-        listing_file.write(line)
+        _write_file_encode(listing_file, line)
     if echo_file:
-        echo_file.write(line)
+        _write_file_encode(echo_file, line)
     return warn
 
 
@@ -216,11 +217,11 @@ def warn_once(position, message, level=0):
     if level < LEVEL or message in _warn_once_seen:
         return
     warn = CompileWarning(position, message)
-    line = "warning: %s\n" % warn
+    line = u"warning: %s\n" % warn
     if listing_file:
-        listing_file.write(line)
+        _write_file_encode(listing_file, line)
     if echo_file:
-        echo_file.write(line)
+        _write_file_encode(echo_file, line)
     _warn_once_seen[message] = True
     return warn
 

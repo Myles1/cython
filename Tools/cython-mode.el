@@ -1,5 +1,7 @@
 ;;; cython-mode.el --- Major mode for editing Cython files
 
+;; License: Apache-2.0
+
 ;;; Commentary:
 
 ;; This should work with python-mode.el as well as either the new
@@ -101,7 +103,7 @@
 (defgroup cython nil "Major mode for editing and compiling Cython files"
   :group 'languages
   :prefix "cython-"
-  :link '(url-link :tag "Homepage" "http://cython.org"))
+  :link '(url-link :tag "Homepage" "https://cython.org/"))
 
 ;;;###autoload
 (defcustom cython-default-compile-format "cython -a %s"

@@ -45,6 +45,8 @@ cdef extern from "Python.h":
 
         newfunc tp_new
         destructor tp_dealloc
+        destructor tp_del
+        destructor tp_finalize
         traverseproc tp_traverse
         inquiry tp_clear
         freefunc tp_free
@@ -62,6 +64,8 @@ cdef extern from "Python.h":
 
         descrgetfunc tp_descr_get
         descrsetfunc tp_descr_set
+
+        unsigned int tp_version_tag
 
     ctypedef struct PyObject:
         Py_ssize_t ob_refcnt
@@ -82,12 +86,12 @@ cdef extern from "Python.h":
     # option currently supported is Py_PRINT_RAW; if given, the str()
     # of the object is written instead of the repr().
 
-    bint PyObject_HasAttrString(object o, char *attr_name)
+    bint PyObject_HasAttrString(object o, const char *attr_name)
     # Returns 1 if o has the attribute attr_name, and 0
     # otherwise. This is equivalent to the Python expression
     # "hasattr(o, attr_name)". This function always succeeds.
 
-    object PyObject_GetAttrString(object o, char *attr_name)
+    object PyObject_GetAttrString(object o, const char *attr_name)
     # Return value: New reference.  Retrieve an attribute named
     # attr_name from object o. Returns the attribute value on success,
     # or NULL on failure. This is the equivalent of the Python
@@ -106,7 +110,7 @@ cdef extern from "Python.h":
 
     object PyObject_GenericGetAttr(object o, object attr_name)
 
-    int PyObject_SetAttrString(object o, char *attr_name, object v) except -1
+    int PyObject_SetAttrString(object o, const char *attr_name, object v) except -1
     # Set the value of the attribute named attr_name, for object o, to
     # the value v. Returns -1 on failure. This is the equivalent of
     # the Python statement "o.attr_name = v".
@@ -118,7 +122,7 @@ cdef extern from "Python.h":
 
     int PyObject_GenericSetAttr(object o, object attr_name, object v) except -1
 
-    int PyObject_DelAttrString(object o, char *attr_name) except -1
+    int PyObject_DelAttrString(object o, const char *attr_name) except -1
     # Delete attribute named attr_name, for object o. Returns -1 on
     # failure. This is the equivalent of the Python statement: "del
     # o.attr_name".
@@ -176,6 +180,14 @@ cdef extern from "Python.h":
     # representation on success, NULL on failure. This is the
     # equivalent of the Python expression "str(o)". Called by the
     # str() built-in function and by the print statement.
+
+    object PyObject_Bytes(object o)
+    # Return value: New reference.
+    # Compute a bytes representation of object o. Return NULL on
+    # failure and a bytes object on success. This is equivalent to
+    # the Python expression bytes(o), when o is not an integer.
+    # Unlike bytes(o), a TypeError is raised when o is an integer
+    # instead of a zero-initialized bytes object.
 
     object PyObject_Unicode(object o)
     # Return value: New reference.
@@ -397,3 +409,4 @@ cdef extern from "Python.h":
     long Py_TPFLAGS_DEFAULT_EXTERNAL
     long Py_TPFLAGS_DEFAULT_CORE
     long Py_TPFLAGS_DEFAULT
+    long Py_TPFLAGS_HAVE_FINALIZE

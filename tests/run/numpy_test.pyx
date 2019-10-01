@@ -1,11 +1,10 @@
-# tag: numpy
+# tag: numpy_old
 # cannot be named "numpy" in order to not clash with the numpy module!
 
 cimport numpy as np
 cimport cython
 
 import re
-import sys
 
 
 def little_endian():
@@ -20,7 +19,7 @@ def testcase(f):
 
 def testcase_have_buffer_interface(f):
     major, minor, *rest = np.__version__.split('.')
-    if (int(major), int(minor)) >= (1, 5) and sys.version_info[:2] >= (2, 6):
+    if (int(major), int(minor)) >= (1, 5):
         __test__[f.__name__] = f.__doc__
     return f
 
@@ -42,15 +41,15 @@ try:
      [5 6 7 8 9]]
     2 0 9 5
 
-    >>> three_dim()
-    [[[  0.   1.   2.   3.]
-      [  4.   5.   6.   7.]]
-    <_BLANKLINE_>
-     [[  8.   9.  10.  11.]
-      [ 12.  13.  14.  15.]]
-    <_BLANKLINE_>
-     [[ 16.  17.  18.  19.]
-      [ 20.  21.  22.  23.]]]
+    >>> three_dim()  # doctest: +NORMALIZE_WHITESPACE
+    [[[0.   1.   2.   3.]
+      [4.   5.   6.   7.]]
+    <BLANKLINE>
+     [[8.   9.  10.  11.]
+      [12.  13.  14.  15.]]
+    <BLANKLINE>
+     [[16.  17.  18.  19.]
+      [20.  21.  22.  23.]]]
     6.0 0.0 13.0 8.0
 
     >>> obj_array()
@@ -134,6 +133,7 @@ try:
        ...
     ValueError: ndarray is not C...contiguous
 
+    >>> test_dtype('?', inc1_bool)
     >>> test_dtype('b', inc1_byte)
     >>> test_dtype('B', inc1_ubyte)
     >>> test_dtype('h', inc1_short)
@@ -270,6 +270,7 @@ except:
 
 __test__[__name__] = __doc__
 
+
 def assert_dtype_sizes():
     assert sizeof(np.int8_t) == 1
     assert sizeof(np.int16_t) == 2
@@ -284,12 +285,21 @@ def assert_dtype_sizes():
     assert sizeof(np.complex64_t) == 8
     assert sizeof(np.complex128_t) == 16
 
+
+@testcase
+def test_enums():
+    """
+    >>> test_enums()
+    """
+    cdef np.NPY_CASTING nc = np.NPY_NO_CASTING
+    assert nc != np.NPY_SAFE_CASTING
+
+
 def ndarray_str(arr):
     u"""
-    Since Py2.3 doctest don't support <BLANKLINE>, manually replace blank lines
-    with <_BLANKLINE_>
+    Work around display differences in NumPy 1.14.
     """
-    return unicode(arr).replace(u'\n\n', u'\n<_BLANKLINE_>\n')
+    return re.sub(ur'\[ +', '[', unicode(arr))
 
 def basic():
     cdef object[int, ndim=2] buf = np.arange(10, dtype='i').reshape((2, 5))
@@ -330,6 +340,7 @@ def test_f_contig(np.ndarray[int, ndim=2, mode='fortran'] arr):
         print u" ".join([unicode(arr[i, j]) for j in range(arr.shape[1])])
 
 # Exhaustive dtype tests -- increments element [1] by 1 (or 1+1j) for all dtypes
+def inc1_bool(np.ndarray[unsigned char] arr):           arr[1] += 1
 def inc1_byte(np.ndarray[char] arr):                    arr[1] += 1
 def inc1_ubyte(np.ndarray[unsigned char] arr):          arr[1] += 1
 def inc1_short(np.ndarray[short] arr):                  arr[1] += 1
@@ -392,6 +403,13 @@ def test_dtype(dtype, inc1):
         a = np.array([0, 10+10j], dtype=dtype)
         inc1(a)
         if a[1] != (11 + 11j): print u"failed!", a[1]
+    elif dtype == '?':
+        # bool ndarrays coerce all values to 0 or 1
+        a = np.array([0, 0], dtype=dtype)
+        inc1(a)
+        if a[1] != 1: print u"failed!"
+        inc1(a)
+        if a[1] != 1: print u"failed!"
     else:
         a = np.array([0, 10], dtype=dtype)
         inc1(a)
@@ -897,6 +915,35 @@ def test_copy_buffer(np.ndarray[double, ndim=1] a):
     a = a.copy()
     a = a.copy()
     return a
+
+
+@testcase
+def test_broadcast_comparison(np.ndarray[double, ndim=1] a):
+    """
+    >>> a = np.ones(10, dtype=np.double)
+    >>> a0, obj0, a1, obj1 = test_broadcast_comparison(a)
+    >>> np.all(a0 == (a == 0)) or a0
+    True
+    >>> np.all(a1 == (a == 1)) or a1
+    True
+    >>> np.all(obj0 == (a == 0)) or obj0
+    True
+    >>> np.all(obj1 == (a == 1)) or obj1
+    True
+
+    >>> a = np.zeros(10, dtype=np.double)
+    >>> a0, obj0, a1, obj1 = test_broadcast_comparison(a)
+    >>> np.all(a0 == (a == 0)) or a0
+    True
+    >>> np.all(a1 == (a == 1)) or a1
+    True
+    >>> np.all(obj0 == (a == 0)) or obj0
+    True
+    >>> np.all(obj1 == (a == 1)) or obj1
+    True
+    """
+    cdef object obj = a
+    return a == 0, obj == 0, a == 1, obj == 1
 
 
 include "numpy_common.pxi"

@@ -83,6 +83,9 @@ __doc__ = ur"""
     >>> print (Ext.n.__doc__)
     Ext.n(self, a: int, b: float = 1.0, *args: tuple, **kwargs: dict) -> (None, True)
 
+    >>> print (Ext.o.__doc__)
+    Ext.o(self, a, b=1, /, c=5, *args, **kwargs)
+
     >>> print (Ext.get_int.__doc__)
     Ext.get_int(self) -> int
 
@@ -265,6 +268,9 @@ cdef class Ext:
     def n(self, a: int, b: float = 1.0, *args: tuple, **kwargs: dict) -> (None, True):
         pass
 
+    def o(self, a, b=1, /, c=5, *args, **kwargs):
+        pass
+
     cpdef int get_int(self):
         return 0
 
@@ -428,6 +434,7 @@ cdef class Foo:
     def m28(self, a: list(range(3))[::1]): pass
     def m29(self, a: list(range(3))[0:1:1]): pass
     def m30(self, a: list(range(3))[7, 3:2:1, ...]): pass
+    def m31(self, double[::1] a): pass
 
 __doc__ += ur"""
 >>> print(Foo.m00.__doc__)
@@ -522,4 +529,7 @@ Foo.m29(self, a: list(range(3))[0:1:1])
 
 >>> print(Foo.m30.__doc__)
 Foo.m30(self, a: list(range(3))[7, 3:2:1, ...])
+
+>>> print(Foo.m31.__doc__)
+Foo.m31(self, double[::1] a)
 """

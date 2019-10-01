@@ -267,6 +267,9 @@ class EvalWithTempExprNode(ExprNodes.ExprNode, LetNodeMixin):
     def infer_type(self, env):
         return self.subexpression.infer_type(env)
 
+    def may_be_none(self):
+        return self.subexpression.may_be_none()
+
     def result(self):
         return self.subexpression.result()
 
@@ -350,6 +353,9 @@ class TempResultFromStatNode(ExprNodes.ExprNode):
     def analyse_types(self, env):
         self.body = self.body.analyse_expressions(env)
         return self
+
+    def may_be_none(self):
+        return self.result_ref.may_be_none()
 
     def generate_result_code(self, code):
         self.result_ref.result_code = self.result()

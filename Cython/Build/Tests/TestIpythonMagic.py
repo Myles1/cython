@@ -10,6 +10,7 @@ import sys
 from contextlib import contextmanager
 from Cython.Build import IpythonMagic
 from Cython.TestUtils import CythonTest
+from Cython.Compiler.Annotate import AnnotationCCodeWriter
 
 try:
     import IPython.testing.globalipapp
@@ -202,11 +203,37 @@ x = sin(0.0)
             ip.run_cell_magic('cython', '--verbose', code)
             ip.ex('g = f(10)')
         self.assertEqual(ip.user_ns['g'], 20.0)
-        self.assertEquals([verbose_log.INFO, verbose_log.DEBUG, verbose_log.INFO],
+        self.assertEqual([verbose_log.INFO, verbose_log.DEBUG, verbose_log.INFO],
                           verbose_log.thresholds)
 
         with mock_distutils() as normal_log:
             ip.run_cell_magic('cython', '', code)
             ip.ex('g = f(10)')
         self.assertEqual(ip.user_ns['g'], 20.0)
-        self.assertEquals([normal_log.INFO], normal_log.thresholds)
+        self.assertEqual([normal_log.INFO], normal_log.thresholds)
+
+    def test_cython_no_annotate(self):
+        ip = self._ip
+        html = ip.run_cell_magic('cython', '', code)
+        self.assertTrue(html is None)
+
+    def test_cython_annotate(self):
+        ip = self._ip
+        html = ip.run_cell_magic('cython', '--annotate', code)
+        # somewhat brittle way to differentiate between annotated htmls
+        # with/without complete source code:
+        self.assertTrue(AnnotationCCodeWriter.COMPLETE_CODE_TITLE not in html.data)
+
+    def test_cython_annotate_default(self):
+        ip = self._ip
+        html = ip.run_cell_magic('cython', '-a', code)
+        # somewhat brittle way to differentiate between annotated htmls
+        # with/without complete source code:
+        self.assertTrue(AnnotationCCodeWriter.COMPLETE_CODE_TITLE not in html.data)
+
+    def test_cython_annotate_complete_c_code(self):
+        ip = self._ip
+        html = ip.run_cell_magic('cython', '--annotate-fullc', code)
+        # somewhat brittle way to differentiate between annotated htmls
+        # with/without complete source code:
+        self.assertTrue(AnnotationCCodeWriter.COMPLETE_CODE_TITLE in html.data)

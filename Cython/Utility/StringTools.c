@@ -7,6 +7,40 @@
 
 #include <string>
 
+
+//////////////////// ssize_strlen.proto ////////////////////
+
+static CYTHON_INLINE Py_ssize_t __Pyx_ssize_strlen(const char *s);/*proto*/
+
+//////////////////// ssize_strlen ////////////////////
+//@requires: IncludeStringH
+
+static CYTHON_INLINE Py_ssize_t __Pyx_ssize_strlen(const char *s) {
+    size_t len = strlen(s);
+    if (unlikely(len > PY_SSIZE_T_MAX)) {
+        PyErr_SetString(PyExc_OverflowError, "byte string is too long");
+        return -1;
+    }
+    return (Py_ssize_t) len;
+}
+
+
+//////////////////// ssize_pyunicode_strlen.proto ////////////////////
+
+static CYTHON_INLINE Py_ssize_t __Pyx_Py_UNICODE_ssize_strlen(const Py_UNICODE *u);/*proto*/
+
+//////////////////// ssize_pyunicode_strlen ////////////////////
+
+static CYTHON_INLINE Py_ssize_t __Pyx_Py_UNICODE_ssize_strlen(const Py_UNICODE *u) {
+    size_t len = __Pyx_Py_UNICODE_strlen(u);
+    if (unlikely(len > PY_SSIZE_T_MAX)) {
+        PyErr_SetString(PyExc_OverflowError, "Py_UNICODE string is too long");
+        return -1;
+    }
+    return (Py_ssize_t) len;
+}
+
+
 //////////////////// InitStrings.proto ////////////////////
 
 static int __Pyx_InitStrings(__Pyx_StringTabEntry *t); /*proto*/
@@ -235,6 +269,9 @@ static CYTHON_INLINE int __Pyx_PyUnicode_Equals(PyObject* s1, PyObject* s2, int 
     } else {
         int result;
         PyObject* py_result = PyObject_RichCompare(s1, s2, equals);
+        #if PY_MAJOR_VERSION < 3
+        Py_XDECREF(owned_ref);
+        #endif
         if (!py_result)
             return -1;
         result = __Pyx_PyObject_IsTrue(py_result);
@@ -328,7 +365,7 @@ static CYTHON_INLINE int __Pyx_GetItemInt_ByteArray_Fast(PyObject* string, Py_ss
     if (wraparound | boundscheck) {
         length = PyByteArray_GET_SIZE(string);
         if (wraparound & unlikely(i < 0)) i += length;
-        if ((!boundscheck) || likely((0 <= i) & (i < length))) {
+        if ((!boundscheck) || likely(__Pyx_is_valid_index(i, length))) {
             return (unsigned char) (PyByteArray_AS_STRING(string)[i]);
         } else {
             PyErr_SetString(PyExc_IndexError, "bytearray index out of range");
@@ -358,7 +395,7 @@ static CYTHON_INLINE int __Pyx_SetItemInt_ByteArray_Fast(PyObject* string, Py_ss
     if (wraparound | boundscheck) {
         length = PyByteArray_GET_SIZE(string);
         if (wraparound & unlikely(i < 0)) i += length;
-        if ((!boundscheck) || likely((0 <= i) & (i < length))) {
+        if ((!boundscheck) || likely(__Pyx_is_valid_index(i, length))) {
             PyByteArray_AS_STRING(string)[i] = (char) v;
             return 0;
         } else {
@@ -391,7 +428,7 @@ static CYTHON_INLINE Py_UCS4 __Pyx_GetItemInt_Unicode_Fast(PyObject* ustring, Py
     if (wraparound | boundscheck) {
         length = __Pyx_PyUnicode_GET_LENGTH(ustring);
         if (wraparound & unlikely(i < 0)) i += length;
-        if ((!boundscheck) || likely((0 <= i) & (i < length))) {
+        if ((!boundscheck) || likely(__Pyx_is_valid_index(i, length))) {
             return __Pyx_PyUnicode_READ_CHAR(ustring, i);
         } else {
             PyErr_SetString(PyExc_IndexError, "string index out of range");
@@ -749,15 +786,15 @@ static CYTHON_INLINE char __Pyx_PyBytes_GetItemInt(PyObject* bytes, Py_ssize_t i
 /////////////// bytes_index ///////////////
 
 static CYTHON_INLINE char __Pyx_PyBytes_GetItemInt(PyObject* bytes, Py_ssize_t index, int check_bounds) {
+    if (index < 0)
+        index += PyBytes_GET_SIZE(bytes);
     if (check_bounds) {
         Py_ssize_t size = PyBytes_GET_SIZE(bytes);
-        if (unlikely(index >= size) | ((index < 0) & unlikely(index < -size))) {
+        if (unlikely(!__Pyx_is_valid_index(index, size))) {
             PyErr_SetString(PyExc_IndexError, "string index out of range");
             return (char) -1;
         }
     }
-    if (index < 0)
-        index += PyBytes_GET_SIZE(bytes);
     return PyBytes_AS_STRING(bytes)[index];
 }
 
@@ -838,7 +875,7 @@ static PyObject* __Pyx_PyUnicode_Join(PyObject* value_tuple, Py_ssize_t value_co
         ukind = __Pyx_PyUnicode_KIND(uval);
         udata = __Pyx_PyUnicode_DATA(uval);
         if (!CYTHON_PEP393_ENABLED || ukind == result_ukind) {
-            memcpy((char *)result_udata + char_pos * result_ukind, udata, ulength * result_ukind);
+            memcpy((char *)result_udata + char_pos * result_ukind, udata, (size_t) (ulength * result_ukind));
         } else {
             #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030300F0 || defined(_PyUnicode_FastCopyCharacters)
             _PyUnicode_FastCopyCharacters(result_uval, char_pos, uval, 0, ulength);
@@ -912,8 +949,8 @@ static PyObject* __Pyx_PyUnicode_BuildFromAscii(Py_ssize_t ulength, char* chars,
 #else
     // non-CPython
     {
-        uval = NULL;
         PyObject *sign = NULL, *padding = NULL;
+        uval = NULL;
         if (uoffset > 0) {
             prepend_sign = !!prepend_sign;
             if (uoffset > prepend_sign) {
@@ -987,7 +1024,7 @@ static CYTHON_INLINE int __Pyx_PyByteArray_AppendObject(PyObject* bytearray, PyO
     {
         // CPython calls PyNumber_Index() internally
         ival = __Pyx_PyIndex_AsSsize_t(value);
-        if (unlikely((ival < 0) | (ival > 255))) {
+        if (unlikely(!__Pyx_is_valid_index(ival, 256))) {
             if (ival == -1 && PyErr_Occurred())
                 return -1;
             goto bad_range;
@@ -1009,7 +1046,7 @@ static CYTHON_INLINE int __Pyx_PyByteArray_Append(PyObject* bytearray, int value
 static CYTHON_INLINE int __Pyx_PyByteArray_Append(PyObject* bytearray, int value) {
     PyObject *pyval, *retval;
 #if CYTHON_COMPILING_IN_CPYTHON
-    if (likely((value >= 0) & (value <= 255))) {
+    if (likely(__Pyx_is_valid_index(value, 256))) {
         Py_ssize_t n = Py_SIZE(bytearray);
         if (likely(n != PY_SSIZE_T_MAX)) {
             if (unlikely(PyByteArray_Resize(bytearray, n + 1) < 0))
@@ -1097,11 +1134,12 @@ static PyObject* __Pyx_PyObject_Format(PyObject* obj, PyObject* format_spec) {
         likely(PyString_CheckExact(s)) ? PyUnicode_FromEncodedObject(s, NULL, "strict") : \
         PyObject_Format(s, f))
 #elif CYTHON_USE_TYPE_SLOTS
-    // Py3 nicely returns unicode strings from str() which makes this quite efficient for builtin types
+    // Py3 nicely returns unicode strings from str() and repr(), which makes this quite efficient for builtin types.
+    // In Py3.8+, tp_str() delegates to tp_repr(), so we call tp_repr() directly here.
     #define __Pyx_PyObject_FormatSimple(s, f) ( \
         likely(PyUnicode_CheckExact(s)) ? (Py_INCREF(s), s) : \
-        likely(PyLong_CheckExact(s)) ? PyLong_Type.tp_str(s) : \
-        likely(PyFloat_CheckExact(s)) ? PyFloat_Type.tp_str(s) : \
+        likely(PyLong_CheckExact(s)) ? PyLong_Type.tp_repr(s) : \
+        likely(PyFloat_CheckExact(s)) ? PyFloat_Type.tp_repr(s) : \
         PyObject_Format(s, f))
 #else
     #define __Pyx_PyObject_FormatSimple(s, f) ( \
@@ -1136,3 +1174,27 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_FormatAndDecref(PyObject* s, PyObj
     Py_DECREF(s);
     return result;
 }
+
+
+//////////////////// PyUnicode_Unicode.proto ////////////////////
+
+static CYTHON_INLINE PyObject* __Pyx_PyUnicode_Unicode(PyObject *obj);/*proto*/
+
+//////////////////// PyUnicode_Unicode ////////////////////
+
+static CYTHON_INLINE PyObject* __Pyx_PyUnicode_Unicode(PyObject *obj) {
+    if (unlikely(obj == Py_None))
+        obj = PYUNICODE("None");
+    return __Pyx_NewRef(obj);
+}
+
+
+//////////////////// PyObject_Unicode.proto ////////////////////
+
+#if PY_MAJOR_VERSION >= 3
+#define __Pyx_PyObject_Unicode(obj) \
+    (likely(PyUnicode_CheckExact(obj)) ? __Pyx_NewRef(obj) : PyObject_Str(obj))
+#else
+#define __Pyx_PyObject_Unicode(obj) \
+    (likely(PyUnicode_CheckExact(obj)) ? __Pyx_NewRef(obj) : PyObject_Unicode(obj))
+#endif

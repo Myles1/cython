@@ -3,6 +3,7 @@
 # tag: cyfunction
 
 import sys
+IS_PY2 = sys.version_info[0] < 3
 IS_PY3 = sys.version_info[0] >= 3
 IS_PY34 = sys.version_info > (3, 4, 0, 'beta', 3)
 
@@ -348,3 +349,76 @@ cdef class TestDecoratedMethods:
         2
         """
         return x
+
+    def test_calls(self, x):
+        """
+        >>> TestDecoratedMethods().test_calls(2)
+        25
+        """
+        return self.test(x) + self.test2(x*10)
+
+
+cdef class TestUnboundMethodCdef:
+    """
+    >>> C = TestUnboundMethodCdef
+    >>> IS_PY2 or (C.meth is C.__dict__["meth"])
+    True
+    """
+    def meth(self): pass
+
+
+class TestUnboundMethod:
+    """
+    >>> C = TestUnboundMethod
+    >>> IS_PY2 or (C.meth is C.__dict__["meth"])
+    True
+    """
+    def meth(self): pass
+
+
+class TestStaticmethod(object):
+    """
+    >>> x = TestStaticmethod()
+    >>> x.staticmeth(42)
+    42
+    >>> x.staticmeth.__get__(42)()
+    42
+    """
+    @staticmethod
+    def staticmeth(arg): return arg
+
+
+cdef class TestOptimisedBuiltinMethod:
+    """
+    >>> obj = TestOptimisedBuiltinMethod()
+    >>> obj.append(2)
+    3
+    >>> obj.call(2)
+    4
+    >>> obj.call(3, obj)
+    5
+    """
+    def append(self, arg):
+        print(arg+1)
+
+    def call(self, arg, obj=None):
+        (obj or self).append(arg+1)  # optimistically optimised => uses fast fallback method call
+
+
+def do_nothing(f):
+    """Dummy decorator for `test_firstlineno_decorated_function`"""
+    return f
+
+
+@do_nothing
+@do_nothing
+def test_firstlineno_decorated_function():
+    """
+    check that `test_firstlineno_decorated_function` starts 5 lines below `do_nothing`
+
+    >>> test_firstlineno_decorated_function()
+    5
+    """
+    l1 = do_nothing.__code__.co_firstlineno
+    l2 = test_firstlineno_decorated_function.__code__.co_firstlineno
+    return l2 - l1

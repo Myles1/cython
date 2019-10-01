@@ -30,17 +30,19 @@ builtin_utility_code = {
 class _BuiltinOverride(object):
     def __init__(self, py_name, args, ret_type, cname, py_equiv="*",
                  utility_code=None, sig=None, func_type=None,
-                 is_strict_signature=False, builtin_return_type=None):
+                 is_strict_signature=False, builtin_return_type=None,
+                 nogil=None):
         self.py_name, self.cname, self.py_equiv = py_name, cname, py_equiv
         self.args, self.ret_type = args, ret_type
         self.func_type, self.sig = func_type, sig
         self.builtin_return_type = builtin_return_type
         self.is_strict_signature = is_strict_signature
         self.utility_code = utility_code
+        self.nogil = nogil
 
     def build_func_type(self, sig=None, self_arg=None):
         if sig is None:
-            sig = Signature(self.args, self.ret_type)
+            sig = Signature(self.args, self.ret_type, nogil=self.nogil)
             sig.exception_check = False  # not needed for the current builtins
         func_type = sig.function_type(self_arg)
         if self.is_strict_signature:
@@ -92,13 +94,13 @@ class BuiltinMethod(_BuiltinOverride):
 builtin_function_table = [
     # name,        args,   return,  C API func,           py equiv = "*"
     BuiltinFunction('abs',        "d",    "d",     "fabs",
-                    is_strict_signature = True),
+                    is_strict_signature=True, nogil=True),
     BuiltinFunction('abs',        "f",    "f",     "fabsf",
-                    is_strict_signature = True),
+                    is_strict_signature=True, nogil=True),
     BuiltinFunction('abs',        "i",    "i",     "abs",
-                    is_strict_signature = True),
+                    is_strict_signature=True, nogil=True),
     BuiltinFunction('abs',        "l",    "l",     "labs",
-                    is_strict_signature = True),
+                    is_strict_signature=True, nogil=True),
     BuiltinFunction('abs',        None,    None,   "__Pyx_abs_longlong",
                 utility_code = UtilityCode.load("abs_longlong", "Builtins.c"),
                 func_type = PyrexTypes.CFuncType(
@@ -124,7 +126,8 @@ builtin_function_table = [
                                   PyrexTypes.c_double_complex_type,
                                   PyrexTypes.c_longdouble_complex_type)
                         ) + [
-    BuiltinFunction('abs',        "O",    "O",     "PyNumber_Absolute"),
+    BuiltinFunction('abs',        "O",    "O",     "__Pyx_PyNumber_Absolute",
+                    utility_code=UtilityCode.load("py_abs", "Builtins.c")),
     #('all',       "",     "",      ""),
     #('any',       "",     "",      ""),
     #('ascii',     "",     "",      ""),
@@ -391,6 +394,8 @@ def init_builtin_types():
         utility = builtin_utility_code.get(name)
         if name == 'frozenset':
             objstruct_cname = 'PySetObject'
+        elif name == 'bytearray':
+            objstruct_cname = 'PyByteArrayObject'
         elif name == 'bool':
             objstruct_cname = None
         elif name == 'Exception':
